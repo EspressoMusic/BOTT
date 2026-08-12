@@ -22,12 +22,15 @@ interface AppState {
   pendingZone: ChartZone | null; // set when the user drag-selects a zone on the chart
   theme: ThemeName;
   thoughtsVisible: boolean; // shared by the thought bubble and the chart's intent arrow
+  instrument: string;
+  instrumentLabel: string;
   setBotEnabled: (v: boolean) => void;
   setActiveStrategyId: (id: string) => void;
   setOpenTrade: (t: Trade | null) => void;
   setPendingZone: (z: ChartZone | null) => void;
   toggleTheme: () => void;
   toggleThoughtsVisible: () => void;
+  setInstrument: (id: string, label: string) => void;
   applyWsMessage: (msg: WsMessage) => void;
 }
 
@@ -43,6 +46,8 @@ export const useAppStore = create<AppState>((set, get) => ({
   pendingZone: null,
   theme: initialTheme,
   thoughtsVisible: true,
+  instrument: 'XAU_USD',
+  instrumentLabel: 'זהב',
   setBotEnabled: (v) => set({ botEnabled: v }),
   setActiveStrategyId: (id) => set({ activeStrategyId: id }),
   setOpenTrade: (t) => set({ openTrade: t }),
@@ -54,6 +59,7 @@ export const useAppStore = create<AppState>((set, get) => ({
     set({ theme: next });
   },
   toggleThoughtsVisible: () => set((state) => ({ thoughtsVisible: !state.thoughtsVisible })),
+  setInstrument: (id, label) => set({ instrument: id, instrumentLabel: label }),
   applyWsMessage: (msg) => {
     if (msg.type === 'trade_opened') {
       set((state) => ({ openTrade: msg.payload, tradeEventVersion: state.tradeEventVersion + 1 }));
@@ -68,6 +74,8 @@ export const useAppStore = create<AppState>((set, get) => ({
       }));
     } else if (msg.type === 'bot_status' && msg.payload.blocked_signal) {
       set({ blockedSignalNotice: `${msg.payload.blocked_signal} נחסם ע"י: ${msg.payload.rule}` });
+    } else if (msg.type === 'instrument_changed') {
+      set({ instrument: msg.payload.instrument, instrumentLabel: msg.payload.label, openTrade: null });
     }
   },
 }));

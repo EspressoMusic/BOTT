@@ -4,6 +4,7 @@ import type {
   ChatMessage,
   FeedbackRule,
   Granularity,
+  InstrumentsResponse,
   JournalNote,
   PortfolioPeriod,
   PortfolioStats,
@@ -33,8 +34,20 @@ export function fetchThoughts(limit = 50): Promise<ThoughtsResponse> {
   return request(`/api/thoughts?limit=${limit}`);
 }
 
-export function fetchTrades(status?: 'OPEN' | 'CLOSED'): Promise<TradesResponse> {
-  return request(`/api/trades${status ? `?status=${status}` : ''}`);
+export function fetchTrades(status?: 'OPEN' | 'CLOSED', instrument?: string): Promise<TradesResponse> {
+  const params = new URLSearchParams();
+  if (status) params.set('status', status);
+  if (instrument) params.set('instrument', instrument);
+  const qs = params.toString();
+  return request(`/api/trades${qs ? `?${qs}` : ''}`);
+}
+
+export function fetchInstruments(): Promise<InstrumentsResponse> {
+  return request('/api/instruments');
+}
+
+export function switchInstrument(instrument: string): Promise<{ instrument: string; label: string }> {
+  return request('/api/instrument', { method: 'POST', body: JSON.stringify({ instrument }) });
 }
 
 export function closePosition(tradeId: number): Promise<{ status: string }> {

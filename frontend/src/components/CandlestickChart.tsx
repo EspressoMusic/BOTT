@@ -134,6 +134,7 @@ export function CandlestickChart({
   const [drag, setDrag] = useState<DragState | null>(null);
   const theme = useAppStore((s) => s.theme);
   const thoughtsVisible = useAppStore((s) => s.thoughtsVisible);
+  const instrument = useAppStore((s) => s.instrument);
   // The strategy's current directional lean while flat (no open trade) — shown
   // as an intent arrow on the chart, tied to the same visibility toggle as the
   // thought bubble.
@@ -152,7 +153,7 @@ export function CandlestickChart({
 
   useEffect(() => {
     let cancelled = false;
-    fetchTrades('CLOSED')
+    fetchTrades('CLOSED', instrument)
       .then((res) => {
         if (!cancelled) setClosedTrades(res.trades);
       })
@@ -160,13 +161,14 @@ export function CandlestickChart({
     return () => {
       cancelled = true;
     };
-  }, []);
+  }, [instrument]);
 
   useEffect(() => {
     if (!latestMessage || latestMessage.type !== 'trade_closed') return;
     const closed = latestMessage.payload;
+    if (closed.instrument !== instrument) return;
     setClosedTrades((prev) => (prev.some((t) => t.id === closed.id) ? prev : [...prev, closed]));
-  }, [latestMessage]);
+  }, [latestMessage, instrument]);
 
   // Live PnL badge that rides the current-price line on the right edge —
   // replaces the chart's own last-value label while a trade is open, and
@@ -236,10 +238,12 @@ export function CandlestickChart({
     };
   }, []);
 
-  // Backfill historical candles whenever the selected timeframe changes.
+  // Backfill historical candles whenever the selected timeframe or the active
+  // trading instrument changes (switching asset resets the chart entirely).
   useEffect(() => {
     let cancelled = false;
     setError(null);
+    setBias(null);
     // Block live updates until the new backfill lands — our live in-memory
     // aggregator and the REST backfill's historical bars aren't bucketed by
     // exactly the same clock, so a stray update for the new granularity could
@@ -264,7 +268,7 @@ export function CandlestickChart({
     return () => {
       cancelled = true;
     };
-  }, [granularity]);
+  }, [granularity, instrument]);
 
   // Apply live tick/candle updates without resetting zoom/scroll (series.update
   // patches the last bar in place or appends a new one, unlike setData). Guarded

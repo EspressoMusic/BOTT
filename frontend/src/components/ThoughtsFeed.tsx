@@ -21,8 +21,14 @@ export function ThoughtsFeed({ latestMessage }: Props) {
   }, []);
 
   useEffect(() => {
-    if (!latestMessage || latestMessage.type !== 'thought') return;
-    setLatest(latestMessage.payload);
+    if (!latestMessage) return;
+    if (latestMessage.type === 'thought') {
+      setLatest(latestMessage.payload);
+    } else if (latestMessage.type === 'instrument_changed') {
+      // Old thoughts were about a different instrument's price action — stale
+      // and misleading once the chart underneath has switched assets.
+      setLatest(null);
+    }
   }, [latestMessage]);
 
   return (

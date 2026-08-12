@@ -23,6 +23,17 @@ export interface CandlesResponse {
   candles: Candle[];
 }
 
+export interface InstrumentInfo {
+  id: string;
+  label: string;
+}
+
+export interface InstrumentsResponse {
+  active: string;
+  active_label: string;
+  available: InstrumentInfo[];
+}
+
 export type SignalAction = 'NONE' | 'BUY' | 'SELL' | 'CLOSE';
 
 export interface Thought {
@@ -144,4 +155,5 @@ export type WsMessage =
   | { type: 'thought'; payload: Thought }
   | { type: 'trade_opened'; payload: Trade }
   | { type: 'trade_closed'; payload: Trade }
-  | { type: 'trade_modified'; payload: Trade };
+  | { type: 'trade_modified'; payload: Trade }
+  | { type: 'instrument_changed'; payload: { instrument: string; label: string } };

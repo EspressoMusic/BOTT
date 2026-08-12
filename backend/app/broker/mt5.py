@@ -105,6 +105,26 @@ class MT5Adapter(BrokerAdapter):
             self._contract_size,
         )
 
+    async def set_symbol(self, symbol: str) -> None:
+        """Switch which MT5 symbol this adapter streams/trades/reports on — used
+        when the frontend's asset picker switches instrument. Re-selects the new
+        symbol in Market Watch and refreshes its contract/volume metadata, the
+        same validation __init__ does for the initial symbol."""
+
+        def _do() -> None:
+            if not mt5.symbol_select(symbol, True):
+                raise RuntimeError(f"MT5 symbol {symbol!r} was not found / could not be added to Market Watch.")
+            info = mt5.symbol_info(symbol)
+            if info is None:
+                raise RuntimeError(f"MT5 symbol_info({symbol!r}) failed: {mt5.last_error()}")
+            self._symbol = symbol
+            self._contract_size = info.trade_contract_size
+            self._volume_min = info.volume_min
+            self._volume_step = info.volume_step
+
+        await self._call(_do)
+        logger.warning("MT5Adapter switched active symbol to %s", symbol)
+
     async def _call(self, fn, *args, **kwargs):
         # MetaTrader5's C extension breaks on some functions (order_send/order_check
         # among them) when called via a site that unpacks *args and **kwargs together

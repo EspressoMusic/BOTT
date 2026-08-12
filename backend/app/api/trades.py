@@ -29,11 +29,17 @@ def _trade_dict(trade: Trade) -> dict:
 
 
 @router.get("/api/trades")
-async def list_trades(status: str | None = Query(None), limit: int = Query(200, ge=1, le=1000)):
+async def list_trades(
+    status: str | None = Query(None),
+    instrument: str | None = Query(None),
+    limit: int = Query(200, ge=1, le=1000),
+):
     with get_session() as session:
         query = select(Trade).order_by(Trade.id.desc()).limit(limit)
         if status:
             query = query.where(Trade.status == status.upper())
+        if instrument:
+            query = query.where(Trade.instrument == instrument)
         rows = session.exec(query).all()
     rows.reverse()
     return {"trades": [_trade_dict(t) for t in rows]}

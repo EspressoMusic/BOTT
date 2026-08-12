@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react';
 import { fetchSettings, fetchTrades } from './api/client';
 import { ChartControlsMenu } from './components/ChartControlsMenu';
 import { DraggableWindow } from './components/DraggableWindow';
+import { InstrumentSelector } from './components/InstrumentSelector';
 import { Modal } from './components/Modal';
 import { SidePanel } from './components/SidePanel';
 import { useWebSocket } from './hooks/useWebSocket';
@@ -55,7 +56,7 @@ function App() {
     <div className="app">
       <header className="app-header">
         <div className="header-left">
-          <h1>זהב</h1>
+          <InstrumentSelector />
         </div>
         <div className="header-right">
           <ChartControlsMenu
