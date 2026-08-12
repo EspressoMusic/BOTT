@@ -170,10 +170,10 @@ export function CandlestickChart({
     setClosedTrades((prev) => (prev.some((t) => t.id === closed.id) ? prev : [...prev, closed]));
   }, [latestMessage, instrument]);
 
-  // Live PnL badge that rides the current-price line on the right edge —
-  // replaces the chart's own last-value label while a trade is open, and
-  // reveals a close (✕) button on hover.
-  const [priceBadge, setPriceBadge] = useState<{ y: number; pnl: number } | null>(null);
+  // Live price + PnL badge that rides the current-price line on the right
+  // edge — replaces the chart's own last-value label while a trade is open,
+  // and reveals a close (✕) button on hover.
+  const [priceBadge, setPriceBadge] = useState<{ y: number; price: number; pnl: number } | null>(null);
 
   useEffect(() => {
     if (!openTrade) {
@@ -188,7 +188,7 @@ export function CandlestickChart({
     if (y == null) return;
     const direction = openTrade.side === 'BUY' ? 1 : -1;
     const pnl = (lastPrice - openTrade.entry_price) * direction * openTrade.units;
-    setPriceBadge({ y, pnl });
+    setPriceBadge({ y, price: lastPrice, pnl });
   }, [latestMessage, openTrade, granularity]);
 
   // Hide the chart's own current-price line/label while the custom PnL badge
@@ -286,22 +286,6 @@ export function CandlestickChart({
       console.warn('Skipped out-of-order candle update', err);
     }
   }, [latestMessage, granularity]);
-
-  // While a trade is open, show its live profit/loss (instead of a static
-  // price) on the entry line's price-axis label, updating on every tick.
-  useEffect(() => {
-    if (!latestMessage || !openTrade || !entryLineRef.current) return;
-    if (latestMessage.type !== 'candle_update' && latestMessage.type !== 'candle_closed') return;
-    if (latestMessage.payload.granularity !== granularity) return;
-    const lastPrice = latestMessage.payload.candle.close;
-    const direction = openTrade.side === 'BUY' ? 1 : -1;
-    const pnl = (lastPrice - openTrade.entry_price) * direction * openTrade.units;
-    const colors = CHART_THEME_COLORS[theme];
-    entryLineRef.current.applyOptions({
-      title: `${pnl >= 0 ? '+' : ''}${pnl.toFixed(2)}$`,
-      color: pnl >= 0 ? colors.up : colors.down,
-    });
-  }, [latestMessage, openTrade, granularity, theme]);
 
   // Entry marker + SL/TP lines for the currently open position (if any).
   useEffect(() => {
@@ -608,6 +592,7 @@ export function CandlestickChart({
           onClick={() => onCloseTrade(openTrade.id)}
           title="לחצו לסגירת העסקה"
         >
+          <span className="chart-price-badge-price">{priceBadge.price.toFixed(2)}</span>
           <span className="chart-price-badge-amount">
             {priceBadge.pnl >= 0 ? '+' : ''}
             {priceBadge.pnl.toFixed(2)}$
