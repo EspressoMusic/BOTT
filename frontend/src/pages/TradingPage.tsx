@@ -1,5 +1,6 @@
 import { closePosition, modifyPosition } from '../api/client';
 import { CandlestickChart } from '../components/CandlestickChart';
+import { EmotionAvatar } from '../components/EmotionAvatar';
 import { ThoughtsFeed } from '../components/ThoughtsFeed';
 import { useAppStore } from '../store/appStore';
 import type { ChartZone, Granularity, WsMessage } from '../types/market';
@@ -41,6 +42,7 @@ export function TradingPage({ latestMessage, granularity, annotating, onZoneSele
         <div className="chart-icon-row">
           <ThoughtsFeed latestMessage={latestMessage} />
         </div>
+        <EmotionAvatar latestMessage={latestMessage} />
       </div>
     </main>
   );

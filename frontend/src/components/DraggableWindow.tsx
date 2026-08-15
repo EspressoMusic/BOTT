@@ -4,18 +4,30 @@ interface Props {
   title: string;
   onClose: () => void;
   children: ReactNode;
+  headerClassName?: string;
 }
 
 const DEFAULT_WIDTH = 380;
 const DEFAULT_HEIGHT = 480;
+// Matches the `@media (max-width: 700px)` breakpoint in index.css, where
+// .drag-window switches to calc(100vw - 24px) / calc(100vh - 24px) — below
+// this width the window is effectively full-screen, not DEFAULT_WIDTH x
+// DEFAULT_HEIGHT, so centering math based on the desktop size would place it
+// off-screen (its real height is far taller than what the math assumed).
+const MOBILE_BREAKPOINT = 700;
 
-export function DraggableWindow({ title, onClose, children }: Props) {
+export function DraggableWindow({ title, onClose, children, headerClassName }: Props) {
   const [pos, setPos] = useState<{ x: number; y: number } | null>(null);
   const dragRef = useRef<{ startX: number; startY: number; originX: number; originY: number } | null>(null);
   const windowRef = useRef<HTMLDivElement>(null);
 
-  // Center the window over the chart the first time it opens.
+  // Center the window over the chart the first time it opens (full-screen
+  // with a small margin on mobile, where the CSS breakpoint takes over).
   useEffect(() => {
+    if (window.innerWidth <= MOBILE_BREAKPOINT) {
+      setPos({ x: 12, y: 12 });
+      return;
+    }
     const width = Math.min(DEFAULT_WIDTH, window.innerWidth - 24);
     const height = Math.min(DEFAULT_HEIGHT, window.innerHeight - 24);
     setPos({ x: (window.innerWidth - width) / 2, y: (window.innerHeight - height) / 2 });
@@ -59,7 +71,7 @@ export function DraggableWindow({ title, onClose, children }: Props) {
 
   return (
     <div ref={windowRef} className="drag-window" style={{ left: pos.x, top: pos.y }}>
-      <div className="drag-window-header" onMouseDown={handleDragStart}>
+      <div className={`drag-window-header ${headerClassName ?? ''}`} onMouseDown={handleDragStart}>
         <h2>{title}</h2>
         <button type="button" className="modal-close" onClick={onClose} aria-label="סגור">
           ✕

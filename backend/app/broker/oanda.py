@@ -134,7 +134,7 @@ class OandaAdapter(BrokerAdapter):
         self,
         instrument: str,
         side: Side,
-        units: int,
+        units: float,
         stop_loss: Optional[float] = None,
         take_profit: Optional[float] = None,
     ) -> OrderResult:

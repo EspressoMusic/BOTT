@@ -3,6 +3,7 @@ import {
   createChart,
   createSeriesMarkers,
   CandlestickSeries,
+  LineSeries,
   LineStyle,
   TickMarkType,
   type IChartApi,
@@ -13,7 +14,7 @@ import {
   type Time,
   type UTCTimestamp,
 } from 'lightweight-charts';
-import { fetchCandles, fetchTrades } from '../api/client';
+import { fetchCandles, fetchThoughts, fetchTrades } from '../api/client';
 import { useAppStore } from '../store/appStore';
 import type { Candle, ChartZone, Granularity, Trade, WsMessage } from '../types/market';
 
@@ -37,8 +38,9 @@ const RECENT_BARS_VISIBLE = 70;
 // Chart colors mirror the CSS theme variables — lightweight-charts renders to
 // its own canvas, so it can't read CSS custom properties directly.
 const CHART_THEME_COLORS = {
-  warm: { bg: '#18130f', text: '#d9cab3', up: '#8fac6f', down: '#c96f4f' },
-  dark: { bg: '#0b0d12', text: '#d1d5db', up: '#26a69a', down: '#ef5350' },
+  warm: { bg: '#18130f', text: '#d9cab3', up: '#8fac6f', down: '#c96f4f', ema: '#4dabf7' },
+  dark: { bg: '#0b0d12', text: '#d1d5db', up: '#26a69a', down: '#ef5350', ema: '#4dabf7' },
+  light: { bg: '#f7f5f1', text: '#3a3630', up: '#2e7d4f', down: '#c1392b', ema: '#1c7ed6' },
 } as const;
 
 interface DragState {
@@ -121,6 +123,7 @@ export function CandlestickChart({
   const containerRef = useRef<HTMLDivElement>(null);
   const chartRef = useRef<IChartApi | null>(null);
   const seriesRef = useRef<ISeriesApi<'Candlestick'> | null>(null);
+  const ema50SeriesRef = useRef<ISeriesApi<'Line'> | null>(null);
   const markersRef = useRef<ISeriesMarkersPluginApi<Time> | null>(null);
   const slLineRef = useRef<IPriceLine | null>(null);
   const tpLineRef = useRef<IPriceLine | null>(null);
@@ -170,6 +173,49 @@ export function CandlestickChart({
     setClosedTrades((prev) => (prev.some((t) => t.id === closed.id) ? prev : [...prev, closed]));
   }, [latestMessage, instrument]);
 
+  // EMA50 line, backfilled from the real thought log (same ema50 the bot's
+  // own EMA50 entry filter checked against) — only meaningful on the M1 chart,
+  // since that's the only granularity the strategy engine actually computes it
+  // on (see TRADE_MARKER_GRANULARITY above for the same reasoning).
+  useEffect(() => {
+    // Cleared eagerly (not just once the fetch below resolves) so a switch
+    // never leaves the previous instrument's EMA50 line on screen — mismatched
+    // scale from whatever asset was active before (e.g. gold's ~4400 range
+    // still drawn under BTC's ~60000 candles) is exactly the kind of "does the
+    // bot even know what it's looking at" confusion this line exists to avoid.
+    ema50SeriesRef.current?.setData([]);
+    if (granularity !== TRADE_MARKER_GRANULARITY) return;
+    let cancelled = false;
+    fetchThoughts(500, instrument)
+      .then((res) => {
+        if (cancelled) return;
+        const byTime = new Map<number, number>();
+        for (const t of res.thoughts) {
+          const value = t.indicators?.ema50;
+          if (typeof value === 'number') byTime.set(t.candle_time, value);
+        }
+        const points = [...byTime.entries()]
+          .sort(([a], [b]) => a - b)
+          .map(([time, value]) => ({ time: time as UTCTimestamp, value }));
+        ema50SeriesRef.current?.setData(points);
+      })
+      .catch(() => {});
+    return () => {
+      cancelled = true;
+    };
+  }, [granularity, instrument]);
+
+  // Live EMA50 updates as each new M1 thought comes in over the WS.
+  useEffect(() => {
+    if (granularity !== TRADE_MARKER_GRANULARITY) return;
+    if (!latestMessage || latestMessage.type !== 'thought') return;
+    if (latestMessage.payload.instrument && latestMessage.payload.instrument !== instrument) return;
+    const { candle_time, indicators } = latestMessage.payload;
+    const value = indicators?.ema50;
+    if (typeof value !== 'number') return;
+    ema50SeriesRef.current?.update({ time: candle_time as UTCTimestamp, value });
+  }, [latestMessage, granularity, instrument]);
+
   // Live price + PnL badge that rides the current-price line on the right
   // edge — replaces the chart's own last-value label while a trade is open,
   // and reveals a close (✕) button on hover.
@@ -218,8 +264,22 @@ export function CandlestickChart({
       wickDownColor: colors.down,
     });
 
+    // The exact EMA50 the bot itself computes (from strategy_engine, always on
+    // M1 — see the ema50SeriesRef effects below) — real values pulled from the
+    // same /api/thoughts history the bot's own decisions are logged with,
+    // never recomputed client-side, so this line can never silently drift
+    // from what actually gated a trade.
+    const ema50Series = chart.addSeries(LineSeries, {
+      color: colors.ema,
+      lineWidth: 2,
+      priceLineVisible: false,
+      lastValueVisible: true,
+      title: 'EMA50',
+    });
+
     chartRef.current = chart;
     seriesRef.current = series;
+    ema50SeriesRef.current = ema50Series;
     markersRef.current = createSeriesMarkers(series, []);
 
     const resizeObserver = new ResizeObserver((entries) => {
@@ -234,6 +294,7 @@ export function CandlestickChart({
       chart.remove();
       chartRef.current = null;
       seriesRef.current = null;
+      ema50SeriesRef.current = null;
       markersRef.current = null;
     };
   }, []);
@@ -370,7 +431,13 @@ export function CandlestickChart({
       color: colors.text,
       lineWidth: 1,
       lineStyle: LineStyle.Dotted,
-      axisLabelVisible: true,
+      // No axis label here — the current-price badge (chart-price-badge,
+      // price + live PnL) sits in that same right-edge spot and, whenever
+      // price is trading near entry (a trade hovering around breakeven,
+      // which happens constantly), the two would overlap and the badge —
+      // the one with the actually useful info — ends up half-hidden behind
+      // "כניסה". The dotted line itself still marks the entry on the chart.
+      axisLabelVisible: false,
       title: 'כניסה',
     });
 
@@ -410,6 +477,7 @@ export function CandlestickChart({
       wickUpColor: colors.up,
       wickDownColor: colors.down,
     });
+    ema50SeriesRef.current?.applyOptions({ color: colors.ema });
   }, [theme]);
 
   // Drag the SL/TP lines directly on the chart to move an open trade's stop

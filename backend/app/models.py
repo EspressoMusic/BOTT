@@ -12,6 +12,9 @@ class ThoughtLog(SQLModel, table=True):
     text: str
     signal: str = "NONE"  # NONE | BUY | SELL | CLOSE
     indicators_json: str = "{}"
+    # "" on rows written before multi-instrument switching existed — /api/thoughts
+    # only filters by it when a value is actually present in the row.
+    instrument: str = ""
 
 
 class Trade(SQLModel, table=True):
@@ -27,8 +30,22 @@ class Trade(SQLModel, table=True):
     exit_reason: Optional[str] = None  # SL | TP | MANUAL
     stop_loss: Optional[float] = None
     take_profit: Optional[float] = None
-    units: int
+    # Raw units of the underlying asset (e.g. troy ounces for gold, whole coins
+    # for BTC) — float, not int: instruments with a small/1.0 MT5 contract_size
+    # (crypto) need sub-1 sizes to keep notional exposure sane relative to a
+    # demo-sized account balance (see order_service, which derives this from
+    # the shared risk_units setting).
+    units: float
     pnl: Optional[float] = None
+    # |entry - stop_loss| captured once at open time, kept even after stop_loss
+    # itself gets moved to breakeven — used to size the extended target in
+    # OrderService._check_breakeven_extension regardless of intervening moves.
+    initial_risk: Optional[float] = None
+    # True once the target has been pushed out past its original take-profit
+    # (see OrderService._check_breakeven_extension) — separate from whether
+    # the stop sits at breakeven, since the halfway-to-target rule can move
+    # the stop there earlier without extending the target.
+    target_extended: bool = False
     strategy_id: str
     signal_reason: str = ""
     created_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))

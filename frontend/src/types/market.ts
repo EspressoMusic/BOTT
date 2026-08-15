@@ -46,6 +46,8 @@ export interface Thought {
   // Which way the strategy currently leans, even while `signal` is NONE. Only
   // present on live WS 'thought' messages, not on the REST backfill.
   bias?: 'BUY' | 'SELL' | null;
+  // "" on rows written before multi-instrument switching existed.
+  instrument?: string;
 }
 
 export interface ThoughtsResponse {
@@ -94,6 +96,12 @@ export interface AppSettings {
   active_strategy_id: string;
   risk_units: string;
   max_concurrent_positions: string;
+  daily_profit_target_pct: string;
+  daily_stop_date: string;
+  chat_direction_bias: '' | 'BUY' | 'SELL';
+  // Human-readable reason the bot's last automatic (non-user) stop tripped —
+  // "" once re-enabled or once the next trading day auto-clears it.
+  auto_stop_message: string;
 }
 
 export interface JournalNote {
@@ -151,7 +159,19 @@ export interface PortfolioStats {
 export type WsMessage =
   | { type: 'candle_update'; payload: { granularity: Granularity; candle: Candle } }
   | { type: 'candle_closed'; payload: { granularity: Granularity; candle: Candle } }
-  | { type: 'bot_status'; payload: { stream?: string; blocked_signal?: string; rule?: string } }
+  | {
+      type: 'bot_status';
+      payload: {
+        stream?: string;
+        blocked_signal?: string;
+        rule?: string;
+        bot_enabled?: boolean;
+        auto_stopped_reason?: string;
+        pnl_pct?: number;
+        stale_minutes?: number | null;
+        direction_bias?: 'BUY' | 'SELL' | null;
+      };
+    }
   | { type: 'thought'; payload: Thought }
   | { type: 'trade_opened'; payload: Trade }
   | { type: 'trade_closed'; payload: Trade }

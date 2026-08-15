@@ -11,11 +11,14 @@ router = APIRouter()
 
 
 @router.get("/api/thoughts")
-async def get_thoughts(limit: int = Query(50, ge=1, le=500)):
+async def get_thoughts(limit: int = Query(50, ge=1, le=500), instrument: str | None = Query(None)):
     with get_session() as session:
-        rows = session.exec(
-            select(ThoughtLog).order_by(ThoughtLog.id.desc()).limit(limit)
-        ).all()
+        query = select(ThoughtLog).order_by(ThoughtLog.id.desc()).limit(limit)
+        if instrument:
+            # Rows written before multi-instrument switching existed have "" —
+            # excluded here same as any other instrument that doesn't match.
+            query = query.where(ThoughtLog.instrument == instrument)
+        rows = session.exec(query).all()
     rows.reverse()
 
     return {
@@ -27,6 +30,7 @@ async def get_thoughts(limit: int = Query(50, ge=1, le=500)):
                 "text": row.text,
                 "signal": row.signal,
                 "indicators": json.loads(row.indicators_json),
+                "instrument": row.instrument,
             }
             for row in rows
         ]

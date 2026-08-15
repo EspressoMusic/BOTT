@@ -55,13 +55,15 @@ export function ChatPanel() {
   );
 }
 
-function AiChatTab() {
+export function AiChatTab() {
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [text, setText] = useState('');
   const [sending, setSending] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const pendingZone = useAppStore((s) => s.pendingZone);
   const setPendingZone = useAppStore((s) => s.setPendingZone);
+  const annotating = useAppStore((s) => s.annotating);
+  const setAnnotating = useAppStore((s) => s.setAnnotating);
   const listRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
@@ -80,14 +82,36 @@ function AiChatTab() {
 
   const submit = async () => {
     if (!text.trim() || sending) return;
+    const messageText = text.trim();
+    const zone = pendingZone;
+    // Negative id keeps this bubble's key unique from any real DB id, so it
+    // never collides while it's swapped out for the server's copy below.
+    const optimisticId = -Date.now();
+    const optimisticMsg: ChatMessage = {
+      id: optimisticId,
+      time: Math.floor(Date.now() / 1000),
+      role: 'user',
+      text: messageText,
+      trade_id: null,
+      zone: zone ?? null,
+    };
+    // Show the user's own message immediately instead of waiting for the
+    // round trip — the "typing" indicator (driven by `sending`) covers the
+    // wait for the bot's reply.
+    setMessages((prev) => [...prev, optimisticMsg]);
+    setText('');
+    setPendingZone(null);
     setSending(true);
     setError(null);
     try {
-      const res = await askChat(text.trim(), pendingZone);
-      setMessages((prev) => [...prev, res.user, res.assistant]);
-      setText('');
-      setPendingZone(null);
+      const res = await askChat(messageText, zone);
+      setMessages((prev) => [...prev.filter((m) => m.id !== optimisticId), res.user, res.assistant]);
     } catch (err) {
+      // The backend only persists the message once the model call succeeds,
+      // so a failure here means it was never actually sent — drop the
+      // optimistic bubble and hand the text back instead of losing it.
+      setMessages((prev) => prev.filter((m) => m.id !== optimisticId));
+      setText(messageText);
       setError(err instanceof Error ? err.message : String(err));
     } finally {
       setSending(false);
@@ -95,36 +119,56 @@ function AiChatTab() {
   };
 
   return (
-    <div className="ai-chat-tab">
-      <p className="chat-hint">שאלו את הבוט על אזור שסימנתם בגרף, על עסקה, או כל שאלה על השוק.</p>
+    <div className="ai-chat-tab wa-chat">
+      <div className="wa-messages" ref={listRef}>
+        {messages.map((m) => (
+          <div key={m.id} className={`wa-row ${m.role === 'user' ? 'wa-row-out' : 'wa-row-in'}`}>
+            <div className={`wa-bubble ${m.role === 'user' ? 'wa-bubble-out' : 'wa-bubble-in'}`}>
+              <span className="wa-bubble-text">{m.text}</span>
+              <span className="wa-bubble-time">
+                {new Date(m.time * 1000).toLocaleTimeString('he-IL', { hour: '2-digit', minute: '2-digit' })}
+              </span>
+            </div>
+          </div>
+        ))}
+        {sending && (
+          <div className="wa-row wa-row-in">
+            <div className="wa-bubble wa-bubble-in wa-typing">
+              <span className="wa-typing-dot" />
+              <span className="wa-typing-dot" />
+              <span className="wa-typing-dot" />
+            </div>
+          </div>
+        )}
+      </div>
+      {error && <p className="settings-error">{error}</p>}
       {pendingZone && (
-        <div className="pending-zone-banner">
+        <div className="wa-reply-preview">
           <span>
             אזור מסומן: {new Date(pendingZone.start_time * 1000).toLocaleTimeString('he-IL')} –{' '}
             {new Date(pendingZone.end_time * 1000).toLocaleTimeString('he-IL')}, מחיר{' '}
             {pendingZone.price_low.toFixed(2)}–{pendingZone.price_high.toFixed(2)}
           </span>
-          <button type="button" onClick={() => setPendingZone(null)}>
-            בטל
+          <button type="button" onClick={() => setPendingZone(null)} aria-label="בטל">
+            ✕
           </button>
         </div>
       )}
-      <div className="ai-chat-messages" ref={listRef}>
-        {messages.length === 0 && <p className="thoughts-empty">שאלו אותי משהו על הגרף או על עסקה</p>}
-        {messages.map((m) => (
-          <div key={m.id} className={`ai-chat-message ai-chat-${m.role}`}>
-            {m.text}
-          </div>
-        ))}
-        {sending && <div className="ai-chat-message ai-chat-assistant ai-chat-typing">חושב...</div>}
-      </div>
-      {error && <p className="settings-error">{error}</p>}
-      <div className="journal-compose">
+      <div className="wa-input-row">
+        <button
+          type="button"
+          className={`wa-annotate-btn ${annotating ? 'active' : ''}`}
+          onClick={() => setAnnotating(true)}
+          title="סמנו אזור בגרף כדי שהבוט יתייחס אליו"
+          aria-label="סמן אזור בגרף"
+        >
+          ✏️
+        </button>
         <textarea
           value={text}
           onChange={(e) => setText(e.target.value)}
-          placeholder="למשל: מה דעתך על האזור הזה?"
-          rows={2}
+          placeholder="הקלידו הודעה"
+          rows={1}
           onKeyDown={(e) => {
             if (e.key === 'Enter' && !e.shiftKey) {
               e.preventDefault();
@@ -132,8 +176,8 @@ function AiChatTab() {
             }
           }}
         />
-        <button type="button" onClick={submit} disabled={sending || !text.trim()}>
-          {sending ? 'שולח...' : 'שלח'}
+        <button type="button" className="wa-send-btn" onClick={submit} disabled={sending || !text.trim()} aria-label="שלח">
+          ➤
         </button>
       </div>
     </div>

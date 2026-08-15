@@ -48,7 +48,7 @@ class BrokerTrade:
     broker_trade_id: str
     instrument: str
     side: Side
-    units: int
+    units: float
     entry_price: float
     unrealized_pnl: float
     stop_loss: Optional[float]
@@ -77,7 +77,7 @@ class BrokerAdapter(ABC):
         self,
         instrument: str,
         side: Side,
-        units: int,
+        units: float,
         stop_loss: Optional[float] = None,
         take_profit: Optional[float] = None,
     ) -> OrderResult:

@@ -19,7 +19,7 @@
   background: var(--bg);
 }
 
-/* Classic cool dark mode — toggled back on via the header theme button. */
+/* Classic cool dark mode — selectable from Settings. */
 :root[data-theme='dark'] {
   --bg: #0b0d12;
   --panel: #12141c;
@@ -33,6 +33,24 @@
   --accent-soft: rgba(110, 168, 254, 0.14);
   --card: #161a24;
   --card-hover: #1c2030;
+}
+
+/* Light mode — selectable from Settings. */
+:root[data-theme='light'] {
+  --bg: #f7f5f1;
+  --panel: #ffffff;
+  --border: #e2ddd2;
+  --text: #3a3630;
+  --text-dim: #8a8275;
+  --heading: #1f1c17;
+  --up: #2e7d4f;
+  --down: #c1392b;
+  --accent: #a97c33;
+  --accent-soft: rgba(169, 124, 51, 0.12);
+  --card: #ffffff;
+  --card-hover: #f1ede4;
+
+  color-scheme: light;
 }
 
 * {
@@ -86,6 +104,37 @@ body {
   display: flex;
   align-items: center;
   gap: 10px;
+}
+
+.today-pnl-badge {
+  font-size: 13px;
+  color: var(--text-dim);
+  direction: rtl;
+  white-space: nowrap;
+}
+
+.direction-bias-badge {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 12px;
+  color: var(--heading);
+  background: var(--accent-soft);
+  border: 1px solid var(--accent);
+  border-radius: 999px;
+  padding: 3px 10px;
+  direction: rtl;
+  white-space: nowrap;
+}
+
+.direction-bias-badge button {
+  background: transparent;
+  border: none;
+  color: var(--heading);
+  cursor: pointer;
+  font-size: 12px;
+  padding: 0;
+  line-height: 1;
 }
 
 .header-icon-btn {
@@ -292,27 +341,30 @@ body {
   background: rgba(201, 154, 82, 0.1);
 }
 
-.chart-controls-action {
-  flex: 1;
-  background: transparent;
-  color: var(--text-dim);
-  border: 1px solid var(--border);
-  border-radius: 6px;
-  padding: 6px 12px;
+
+.auto-stop-banner {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  background: #c1392b;
+  color: #fff;
+  padding: 10px 16px;
   font-size: 13px;
+  font-weight: 500;
+  line-height: 1.4;
+}
+
+.auto-stop-banner button {
+  flex-shrink: 0;
+  background: rgba(255, 255, 255, 0.15);
+  border: none;
+  color: #fff;
+  border-radius: 6px;
+  width: 24px;
+  height: 24px;
   cursor: pointer;
-  text-align: center;
-}
-
-.chart-controls-action:hover {
-  color: var(--text);
-  border-color: var(--text-dim);
-}
-
-.chart-controls-action.active {
-  color: var(--accent);
-  border-color: var(--accent);
-  background: rgba(201, 154, 82, 0.1);
+  font-size: 13px;
 }
 
 .pending-zone-banner {
@@ -492,6 +544,89 @@ body {
   direction: rtl;
 }
 
+.emotion-avatar {
+  position: absolute;
+  bottom: 40px;
+  left: 12px;
+  z-index: 6;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 6px;
+  pointer-events: none;
+}
+
+.emotion-face {
+  font-size: 64px;
+  line-height: 1;
+  filter: drop-shadow(0 4px 10px rgba(0, 0, 0, 0.4));
+  animation: emotion-idle-bob 3s ease-in-out infinite;
+}
+
+.emotion-happy .emotion-face {
+  animation: emotion-happy-bounce 0.6s ease-in-out 2;
+}
+
+.emotion-angry .emotion-face {
+  animation: emotion-angry-shake 0.4s ease-in-out 3;
+}
+
+.emotion-caption {
+  max-width: 200px;
+  background: color-mix(in srgb, var(--bg) 88%, transparent);
+  color: var(--heading);
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  padding: 6px 12px;
+  font-size: 12px;
+  text-align: center;
+  direction: rtl;
+}
+
+.emotion-happy .emotion-caption {
+  border-color: var(--up);
+}
+
+.emotion-angry .emotion-caption {
+  border-color: var(--down);
+}
+
+@keyframes emotion-idle-bob {
+  0%,
+  100% {
+    transform: translateY(0);
+  }
+  50% {
+    transform: translateY(-4px);
+  }
+}
+
+@keyframes emotion-happy-bounce {
+  0%,
+  100% {
+    transform: scale(1) rotate(0deg);
+  }
+  30% {
+    transform: scale(1.25) rotate(-8deg);
+  }
+  60% {
+    transform: scale(1.1) rotate(8deg);
+  }
+}
+
+@keyframes emotion-angry-shake {
+  0%,
+  100% {
+    transform: translateX(0) rotate(0deg);
+  }
+  25% {
+    transform: translateX(-6px) rotate(-6deg);
+  }
+  75% {
+    transform: translateX(6px) rotate(6deg);
+  }
+}
+
 .chart-icon-btn {
   background: color-mix(in srgb, var(--bg) 90%, transparent);
   color: var(--text);
@@ -508,40 +643,6 @@ body {
 .chart-icon-btn.active {
   border-color: var(--accent);
   background: rgba(201, 154, 82, 0.12);
-}
-
-.chart-controls {
-  position: relative;
-}
-
-.chart-controls-panel {
-  position: absolute;
-  top: calc(100% + 8px);
-  right: 0;
-  width: 260px;
-  background: var(--panel);
-  border: 1px solid var(--border);
-  border-radius: 10px;
-  padding: 12px;
-  display: flex;
-  flex-direction: column;
-  gap: 12px;
-  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.4);
-  direction: rtl;
-}
-
-.chart-controls-row {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 8px;
-  flex-wrap: wrap;
-}
-
-.chart-controls-label {
-  font-size: 12px;
-  color: var(--text-dim);
-  flex-shrink: 0;
 }
 
 .strategy-selector {
@@ -657,40 +758,220 @@ select option {
   flex: 1;
 }
 
-.ai-chat-messages {
+/* --- AI chat: WhatsApp look --- */
+
+.wa-chat {
+  background-color: #0b141a;
+  background-image:
+    linear-gradient(135deg, rgba(255, 255, 255, 0.025) 25%, transparent 25%),
+    linear-gradient(225deg, rgba(255, 255, 255, 0.025) 25%, transparent 25%),
+    linear-gradient(45deg, rgba(255, 255, 255, 0.025) 25%, transparent 25%),
+    linear-gradient(315deg, rgba(255, 255, 255, 0.025) 25%, transparent 25%);
+  background-position: 20px 0, 20px 0, 0 0, 0 0;
+  background-size: 40px 40px;
+}
+
+.wa-messages {
   flex: 1;
   min-height: 0;
   overflow-y: auto;
   display: flex;
   flex-direction: column;
-  gap: 8px;
-  margin-bottom: 10px;
+  gap: 2px;
+  padding: 10px 8px;
 }
 
-.ai-chat-message {
-  max-width: 85%;
-  padding: 8px 12px;
-  border-radius: 12px;
+.wa-row {
+  display: flex;
+}
+
+.wa-row-out {
+  justify-content: flex-end;
+}
+
+.wa-row-in {
+  justify-content: flex-start;
+}
+
+.wa-bubble {
+  max-width: 78%;
+  padding: 6px 8px;
+  border-radius: 8px;
   font-size: 13px;
-  line-height: 1.4;
+  line-height: 1.35;
+  direction: rtl;
+  box-shadow: 0 1px 1px rgba(0, 0, 0, 0.3);
 }
 
-.ai-chat-user {
-  align-self: flex-start;
-  background: var(--accent-soft);
-  border: 1px solid var(--accent);
-  color: var(--heading);
+.wa-bubble-in {
+  background: #202c33;
+  color: #e9edef;
+  border-top-right-radius: 0;
 }
 
-.ai-chat-assistant {
-  align-self: flex-end;
-  background: var(--card);
-  border: 1px solid var(--border);
+.wa-bubble-out {
+  background: #005c4b;
+  color: #e9edef;
+  border-top-left-radius: 0;
 }
 
-.ai-chat-typing {
-  color: var(--text-dim);
-  font-style: italic;
+.wa-bubble-text {
+  white-space: pre-wrap;
+  word-break: break-word;
+}
+
+.wa-bubble-time {
+  display: block;
+  text-align: left;
+  direction: ltr;
+  font-size: 10px;
+  color: rgba(233, 237, 239, 0.55);
+  margin-top: 2px;
+}
+
+.wa-typing {
+  display: flex;
+  gap: 4px;
+  align-items: center;
+  padding: 10px 12px;
+}
+
+.wa-typing-dot {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: rgba(233, 237, 239, 0.6);
+  animation: wa-typing-bounce 1.2s infinite ease-in-out;
+}
+
+.wa-typing-dot:nth-child(2) {
+  animation-delay: 0.15s;
+}
+
+.wa-typing-dot:nth-child(3) {
+  animation-delay: 0.3s;
+}
+
+@keyframes wa-typing-bounce {
+  0%,
+  60%,
+  100% {
+    transform: translateY(0);
+    opacity: 0.6;
+  }
+  30% {
+    transform: translateY(-3px);
+    opacity: 1;
+  }
+}
+
+.wa-reply-preview {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  background: #1f2c34;
+  border-right: 3px solid #00a884;
+  color: #8696a0;
+  font-size: 11px;
+  padding: 6px 10px;
+  margin: 0 8px 6px;
+  border-radius: 6px 0 0 6px;
+  direction: rtl;
+}
+
+.wa-reply-preview button {
+  flex-shrink: 0;
+  background: transparent;
+  border: none;
+  color: #8696a0;
+  cursor: pointer;
+  font-size: 12px;
+  padding: 2px;
+}
+
+.wa-input-row {
+  display: flex;
+  align-items: flex-end;
+  gap: 8px;
+  padding: 8px;
+  background: #202c33;
+}
+
+.wa-input-row textarea {
+  flex: 1;
+  resize: none;
+  background: #2a3942;
+  color: #e9edef;
+  border: none;
+  border-radius: 20px;
+  padding: 9px 14px;
+  font: inherit;
+  font-size: 13px;
+  direction: rtl;
+  max-height: 90px;
+}
+
+.wa-input-row textarea::placeholder {
+  color: #8696a0;
+}
+
+.wa-input-row textarea:focus {
+  outline: none;
+}
+
+.wa-send-btn {
+  flex-shrink: 0;
+  width: 34px;
+  height: 34px;
+  border-radius: 50%;
+  border: none;
+  background: #00a884;
+  color: #0b141a;
+  font-size: 15px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+}
+
+.wa-send-btn:disabled {
+  background: #2a3942;
+  color: #8696a0;
+  cursor: default;
+}
+
+.wa-annotate-btn {
+  flex-shrink: 0;
+  width: 34px;
+  height: 34px;
+  border-radius: 50%;
+  border: none;
+  background: #2a3942;
+  color: #e9edef;
+  font-size: 14px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+}
+
+.wa-annotate-btn.active {
+  background: #00a884;
+}
+
+.drag-window-header.wa-header {
+  background: #202c33;
+  border-bottom: none;
+}
+
+.drag-window-header.wa-header h2 {
+  color: #e9edef;
+}
+
+.drag-window-header.wa-header .modal-close {
+  border-color: rgba(233, 237, 239, 0.3);
+  color: #e9edef;
 }
 
 .journal-list,
@@ -897,6 +1178,33 @@ select option {
 .settings-table tr.active-row td:first-child {
   color: var(--up);
   font-weight: 600;
+}
+
+.theme-picker {
+  display: flex;
+  gap: 8px;
+}
+
+.theme-picker button {
+  flex: 1;
+  background: transparent;
+  color: var(--text-dim);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 10px 8px;
+  font-size: 13px;
+  cursor: pointer;
+}
+
+.theme-picker button:hover {
+  color: var(--text);
+  border-color: var(--text-dim);
+}
+
+.theme-picker button.active {
+  color: var(--heading);
+  background: var(--accent-soft);
+  border-color: var(--accent);
 }
 
 .custom-strategy-builder {
@@ -1107,6 +1415,7 @@ select option {
   background: var(--bg);
   border: 1px solid var(--border);
   border-radius: 12px;
+  overflow: hidden;
   box-shadow: 0 16px 48px rgba(0, 0, 0, 0.5);
   z-index: 60;
   display: flex;
@@ -1153,10 +1462,6 @@ select option {
 
   .app-header h1 {
     font-size: 15px;
-  }
-
-  .chart-controls-panel {
-    max-width: calc(100vw - 24px);
   }
 
   /* Not enough width beside the robot icon on a phone — stack below instead. */

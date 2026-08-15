@@ -103,6 +103,19 @@ async def lifespan(app: FastAPI):
         )
 
     broker = get_broker_adapter(settings)
+    if isinstance(broker, MT5Adapter):
+        # get_broker_adapter always connects MT5Adapter to the .env default
+        # symbol (settings.mt5_symbol) — if the user last switched to a
+        # different instrument before this restart, align it to that
+        # persisted choice now, before anything seeds candle history from it.
+        # Skipping this left the broker silently trading/streaming the .env
+        # default symbol under the *persisted* instrument's label — e.g. a
+        # restart while BTC_USD was active reconnected to XAUUSD instead,
+        # which then read as "stale" (gold's market was closed) even though
+        # BTC's own data was live the whole time.
+        info = find_instrument(initial_instrument)
+        if info is not None:
+            await broker.set_symbol(info.mt5_symbol)
     ws_manager = ConnectionManager()
 
     is_live = settings.execution_mode == "live"

@@ -7,8 +7,9 @@ router = APIRouter()
 
 
 class SettingsUpdate(BaseModel):
-    risk_units: int | None = None
+    risk_units: float | None = None
     max_concurrent_positions: int | None = None
+    daily_profit_target_pct: float | None = None
 
 
 @router.get("/api/settings")
@@ -22,4 +23,6 @@ async def update_settings(update: SettingsUpdate):
         set_setting("risk_units", str(update.risk_units))
     if update.max_concurrent_positions is not None:
         set_setting("max_concurrent_positions", str(update.max_concurrent_positions))
+    if update.daily_profit_target_pct is not None:
+        set_setting("daily_profit_target_pct", str(update.daily_profit_target_pct))
     return get_all_settings()

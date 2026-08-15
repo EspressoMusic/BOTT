@@ -16,6 +16,7 @@ from app.strategies.moving_average import MovingAverageCrossoverStrategy
 from app.strategies.rsi_mean_reversion import RsiMeanReversionStrategy
 from app.strategies.rule_based import RuleBasedStrategy
 from app.strategies.scalping import ScalpingStrategy
+from app.strategies.shilo import ShiloStrategy
 
 BUILTIN_STRATEGY_CLASSES = {
     ScalpingStrategy.id: ScalpingStrategy,
@@ -24,6 +25,7 @@ BUILTIN_STRATEGY_CLASSES = {
     MacdTrendStrategy.id: MacdTrendStrategy,
     BollingerBreakoutStrategy.id: BollingerBreakoutStrategy,
     AtrTrendFollowingStrategy.id: AtrTrendFollowingStrategy,
+    ShiloStrategy.id: ShiloStrategy,
 }
 
 

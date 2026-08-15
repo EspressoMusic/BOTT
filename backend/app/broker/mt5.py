@@ -137,7 +137,7 @@ class MT5Adapter(BrokerAdapter):
             return await loop.run_in_executor(self._executor, lambda: fn(**kwargs))
         return await loop.run_in_executor(self._executor, lambda: fn(*args))
 
-    def _units_to_volume(self, units: int) -> float:
+    def _units_to_volume(self, units: float) -> float:
         raw_lots = units / self._contract_size
         steps = max(round(raw_lots / self._volume_step), 1)
         return round(steps * self._volume_step, 8)
@@ -197,7 +197,7 @@ class MT5Adapter(BrokerAdapter):
         self,
         instrument: str,
         side: Side,
-        units: int,
+        units: float,
         stop_loss: Optional[float] = None,
         take_profit: Optional[float] = None,
     ) -> OrderResult:
@@ -298,7 +298,7 @@ class MT5Adapter(BrokerAdapter):
                 broker_trade_id=str(p.ticket),
                 instrument=p.symbol,
                 side="BUY" if p.type == mt5.POSITION_TYPE_BUY else "SELL",
-                units=round(p.volume * self._contract_size),
+                units=round(p.volume * self._contract_size, 8),
                 entry_price=p.price_open,
                 unrealized_pnl=p.profit,
                 stop_loss=p.sl if p.sl else None,

@@ -2,20 +2,34 @@ import { useEffect, useState } from 'react';
 import { createCustomStrategy, deleteCustomStrategy, fetchSettings, fetchStrategies, updateSettings } from '../api/client';
 import { CollapsibleSection } from '../components/CollapsibleSection';
 import { KillSwitchToggle } from '../components/KillSwitchToggle';
+import { StrategySelector } from '../components/StrategySelector';
+import { TimeframeSelector } from '../components/TimeframeSelector';
 import { useAppStore } from '../store/appStore';
 import type { StrategyInfo } from '../types/market';
 
 export function SettingsPage() {
   const [riskUnits, setRiskUnits] = useState('10');
   const [maxPositions, setMaxPositions] = useState('1');
+  const [dailyProfitTargetPct, setDailyProfitTargetPct] = useState('0');
+  const [dailyStopDate, setDailyStopDate] = useState('');
   const [strategies, setStrategies] = useState<StrategyInfo[]>([]);
   const [saving, setSaving] = useState(false);
   const activeStrategyId = useAppStore((s) => s.activeStrategyId);
+  const granularity = useAppStore((s) => s.granularity);
+  const setGranularity = useAppStore((s) => s.setGranularity);
+  const setAnnotating = useAppStore((s) => s.setAnnotating);
+  const theme = useAppStore((s) => s.theme);
+  const setTheme = useAppStore((s) => s.setTheme);
+  const setJournalOpen = useAppStore((s) => s.setJournalOpen);
+  const emotionModeEnabled = useAppStore((s) => s.emotionModeEnabled);
+  const setEmotionModeEnabled = useAppStore((s) => s.setEmotionModeEnabled);
 
   const load = async () => {
     const [s, strats] = await Promise.all([fetchSettings(), fetchStrategies()]);
     setRiskUnits(s.risk_units);
     setMaxPositions(s.max_concurrent_positions);
+    setDailyProfitTargetPct(s.daily_profit_target_pct);
+    setDailyStopDate(s.daily_stop_date);
     setStrategies(strats.strategies);
   };
 
@@ -26,7 +40,11 @@ export function SettingsPage() {
   const saveRisk = async () => {
     setSaving(true);
     try {
-      await updateSettings({ risk_units: riskUnits, max_concurrent_positions: maxPositions });
+      await updateSettings({
+        risk_units: riskUnits,
+        max_concurrent_positions: maxPositions,
+        daily_profit_target_pct: dailyProfitTargetPct,
+      });
     } finally {
       setSaving(false);
     }
@@ -39,26 +57,61 @@ export function SettingsPage() {
 
   return (
     <div className="settings-page">
-      <CollapsibleSection title="מתג הפעלה">
+      <CollapsibleSection title="בקרות" defaultOpen>
         <p className="settings-hint">כיבוי עוצר פתיחת עסקאות חדשות מיידית. פוזיציות פתוחות ממשיכות עם ה-SL/TP שלהן.</p>
         <KillSwitchToggle />
+        <div className="settings-form-row">
+          <label>טווח זמן בגרף</label>
+          <TimeframeSelector value={granularity} onChange={setGranularity} />
+        </div>
+        <div className="settings-form-row">
+          <label>סימון אזור בגרף</label>
+          <button type="button" className="annotate-toggle" onClick={() => setAnnotating(true)}>
+            🖊️ סמן אזור
+          </button>
+        </div>
+        <div className="settings-form-row">
+          <label>הערות אישיות וחוקי פידבק</label>
+          <button type="button" onClick={() => setJournalOpen(true)}>
+            💬 יומן וחוקים
+          </button>
+        </div>
       </CollapsibleSection>
 
       <CollapsibleSection title="ניהול סיכון">
         <div className="settings-form-row">
-          <label>גודל עסקה (יחידות)</label>
-          <input type="number" value={riskUnits} onChange={(e) => setRiskUnits(e.target.value)} />
+          <label>גודל עסקה (יחידות מהנכס הבסיסי — למשל אונקיות זהב או מטבעות ביטקוין)</label>
+          <input type="number" step="any" min="0" value={riskUnits} onChange={(e) => setRiskUnits(e.target.value)} />
         </div>
         <div className="settings-form-row">
           <label>מספר פוזיציות פתוחות מקסימלי</label>
           <input type="number" value={maxPositions} onChange={(e) => setMaxPositions(e.target.value)} />
         </div>
+        <div className="settings-form-row">
+          <label>עצירה אוטומטית ביעד רווח יומי (% מהתיק, 0 = כבוי)</label>
+          <input
+            type="number"
+            step="0.1"
+            min="0"
+            value={dailyProfitTargetPct}
+            onChange={(e) => setDailyProfitTargetPct(e.target.value)}
+          />
+        </div>
+        <p className="settings-hint">
+          כשמופעל, ברגע שהרווח הממומש היום מגיע לאחוז הזה מהיתרה שאיתה התחיל היום המסחרי — הבוט כובה אוטומטית (מתג
+          ההפעלה) עד פתיחת סשן לונדון הבא (08:00 UTC), ואז חוזר לפעול לבד.
+        </p>
+        {dailyStopDate && <p className="settings-hint">הבוט נעצר אוטומטית עקב יעד הרווח ביום {dailyStopDate}.</p>}
         <button type="button" onClick={saveRisk} disabled={saving}>
           {saving ? 'שומר...' : 'שמור'}
         </button>
       </CollapsibleSection>
 
       <CollapsibleSection title="אסטרטגיות">
+        <div className="settings-form-row">
+          <label>אסטרטגיה פעילה</label>
+          <StrategySelector />
+        </div>
         <table className="settings-table">
           <tbody>
             {strategies.map((s) => (
@@ -78,6 +131,39 @@ export function SettingsPage() {
           </tbody>
         </table>
         <CustomStrategyBuilder onCreated={load} />
+      </CollapsibleSection>
+
+      <CollapsibleSection title="עיצוב">
+        <div className="theme-picker">
+          <button type="button" className={theme === 'dark' ? 'active' : ''} onClick={() => setTheme('dark')}>
+            🌙 כהה
+          </button>
+          <button type="button" className={theme === 'light' ? 'active' : ''} onClick={() => setTheme('light')}>
+            ☀️ בהיר
+          </button>
+          <button type="button" className={theme === 'warm' ? 'active' : ''} onClick={() => setTheme('warm')}>
+            🟤 חום עדין
+          </button>
+        </div>
+      </CollapsibleSection>
+
+      <CollapsibleSection title="מצב מצחיק 🤪">
+        <p className="settings-hint">
+          פרצוף גדול של הבוט שמגיב לתוצאות שלו בזמן אמת — שמח כשעסקה מרוויחה, מתעצבן כשעסקה מפסידה. תכונה קוסמטית
+          בלבד, לא משפיעה על המסחר.
+        </p>
+        <div className="settings-form-row">
+          <label>הפעל מצב מצחיק</label>
+          <button
+            type="button"
+            className={`bot-switch ${emotionModeEnabled ? 'on' : 'off'}`}
+            onClick={() => setEmotionModeEnabled(!emotionModeEnabled)}
+            role="switch"
+            aria-checked={emotionModeEnabled}
+          >
+            <span className="bot-switch-knob" />
+          </button>
+        </div>
       </CollapsibleSection>
 
       <CollapsibleSection title="חיבור לברוקר">

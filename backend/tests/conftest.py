@@ -9,6 +9,15 @@ from pathlib import Path
 TEST_DB_PATH = Path(__file__).parent / "test_bott.db"
 os.environ["BOTT_DATABASE_URL"] = f"sqlite:///{TEST_DB_PATH}"
 
+# Tests place plenty of fake trades (fake prices, "test" as the strategy id,
+# instrument defaulting to XAU_USD) — without this, a real TELEGRAM_BOT_TOKEN
+# in .env means every test run spams the real Telegram chat with dozens of
+# fake "trade opened/closed" messages. Env vars take precedence over .env in
+# pydantic-settings, and this must run before app.config is first imported
+# anywhere (conftest.py is always collected first) for that to take effect.
+os.environ["TELEGRAM_BOT_TOKEN"] = ""
+os.environ["TELEGRAM_CHAT_ID"] = ""
+
 import pytest  # noqa: E402
 from sqlmodel import SQLModel  # noqa: E402
 

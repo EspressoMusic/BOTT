@@ -1,30 +1,37 @@
 import { useEffect, useState } from 'react';
 import { fetchSettings, fetchTrades } from './api/client';
-import { ChartControlsMenu } from './components/ChartControlsMenu';
+import { DirectionBiasBadge } from './components/DirectionBiasBadge';
 import { DraggableWindow } from './components/DraggableWindow';
 import { InstrumentSelector } from './components/InstrumentSelector';
 import { Modal } from './components/Modal';
 import { SidePanel } from './components/SidePanel';
+import { TodayPnlBadge } from './components/TodayPnlBadge';
 import { useWebSocket } from './hooks/useWebSocket';
 import { PortfolioPage } from './pages/PortfolioPage';
 import { SettingsPage } from './pages/SettingsPage';
 import { TradingPage } from './pages/TradingPage';
 import { useAppStore } from './store/appStore';
-import type { ChartZone, Granularity, WsMessage } from './types/market';
+import type { ChartZone, WsMessage } from './types/market';
 
 type ModalScreen = 'settings' | 'portfolio' | null;
 
 function App() {
   const [latestMessage, setLatestMessage] = useState<WsMessage | null>(null);
   const [modalScreen, setModalScreen] = useState<ModalScreen>(null);
-  const [granularity, setGranularity] = useState<Granularity>('M1');
-  const [annotating, setAnnotating] = useState(false);
-  const [journalOpen, setJournalOpen] = useState(false);
   const applyWsMessage = useAppStore((s) => s.applyWsMessage);
   const setBotEnabled = useAppStore((s) => s.setBotEnabled);
   const setActiveStrategyId = useAppStore((s) => s.setActiveStrategyId);
   const setOpenTrade = useAppStore((s) => s.setOpenTrade);
+  const setDirectionBias = useAppStore((s) => s.setDirectionBias);
+  const annotating = useAppStore((s) => s.annotating);
+  const setAnnotating = useAppStore((s) => s.setAnnotating);
   const setPendingZone = useAppStore((s) => s.setPendingZone);
+  const granularity = useAppStore((s) => s.granularity);
+  const journalOpen = useAppStore((s) => s.journalOpen);
+  const setJournalOpen = useAppStore((s) => s.setJournalOpen);
+  const autoStopNotice = useAppStore((s) => s.autoStopNotice);
+  const setAutoStopNotice = useAppStore((s) => s.setAutoStopNotice);
+  const dismissAutoStopNotice = useAppStore((s) => s.dismissAutoStopNotice);
 
   useWebSocket((msg) => {
     setLatestMessage(msg);
@@ -38,6 +45,12 @@ function App() {
       .then((s) => {
         setBotEnabled(s.bot_enabled === 'true');
         setActiveStrategyId(s.active_strategy_id);
+        setDirectionBias(s.chat_direction_bias || null);
+        // Persisted (not just pushed live over the WS) precisely so a page
+        // opened/reloaded after the bot already auto-stopped itself still
+        // explains why — a WS broadcast alone only reaches clients that were
+        // already connected at the exact moment it fired.
+        if (s.bot_enabled === 'false' && s.auto_stop_message) setAutoStopNotice(s.auto_stop_message);
       })
       .catch(() => {});
     fetchTrades('OPEN')
@@ -45,7 +58,15 @@ function App() {
       // recently opened position, not just whichever happens to sort first.
       .then((res) => setOpenTrade(res.trades[res.trades.length - 1] ?? null))
       .catch(() => {});
-  }, [setBotEnabled, setActiveStrategyId, setOpenTrade]);
+  }, [setBotEnabled, setActiveStrategyId, setOpenTrade, setDirectionBias, setAutoStopNotice]);
+
+  // The timeframe/strategy/mark-zone/journal controls all now live in the
+  // Settings modal, which sits on top of the chart — starting to mark a zone
+  // needs the chart visible and interactive underneath, so close whichever
+  // modal is open the moment annotate mode turns on.
+  useEffect(() => {
+    if (annotating) setModalScreen(null);
+  }, [annotating]);
 
   const handleZoneSelected = (zone: ChartZone) => {
     setPendingZone(zone);
@@ -54,20 +75,21 @@ function App() {
 
   return (
     <div className="app">
+      {autoStopNotice && (
+        <div className="auto-stop-banner" role="alert">
+          <span>⚠️ {autoStopNotice}</span>
+          <button type="button" onClick={dismissAutoStopNotice} aria-label="סגור">
+            ✕
+          </button>
+        </div>
+      )}
       <header className="app-header">
         <div className="header-left">
           <InstrumentSelector />
+          <TodayPnlBadge />
+          <DirectionBiasBadge />
         </div>
         <div className="header-right">
-          <ChartControlsMenu
-            granularity={granularity}
-            onGranularityChange={setGranularity}
-            annotating={annotating}
-            onToggleAnnotate={() => setAnnotating((v) => !v)}
-            journalOpen={journalOpen}
-            onToggleJournal={() => setJournalOpen((v) => !v)}
-            onOpenPortfolio={() => setModalScreen('portfolio')}
-          />
           <button
             type="button"
             className="header-icon-btn"

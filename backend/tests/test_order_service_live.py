@@ -36,6 +36,9 @@ class FakeLiveBroker:
         self.open_ids.discard(trade_id)
         return OrderResult(success=True, broker_trade_id=trade_id, fill_price=2400.0, message="closed")
 
+    async def modify_position(self, trade_id: str, stop_loss: float | None = None, take_profit: float | None = None) -> bool:
+        return trade_id in self.open_ids
+
     async def get_open_trades(self) -> list[BrokerTrade]:
         return [
             BrokerTrade(

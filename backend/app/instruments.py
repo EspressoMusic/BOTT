@@ -20,6 +20,7 @@ class InstrumentInfo:
 AVAILABLE_INSTRUMENTS: list[InstrumentInfo] = [
     InstrumentInfo(id="XAU_USD", label="זהב", mt5_symbol="XAUUSD"),
     InstrumentInfo(id="EUR_USD", label="יורו/דולר", mt5_symbol="EURUSD"),
+    InstrumentInfo(id="BTC_USD", label="ביטקוין", mt5_symbol="BTCUSD"),
 ]
 
 _LABELS = {i.id: i.label for i in AVAILABLE_INSTRUMENTS}

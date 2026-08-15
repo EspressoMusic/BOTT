@@ -27,5 +27,10 @@ class Settings(BaseSettings):
     mt5_server: str = ""
     mt5_terminal_path: str = ""
 
+    # Optional trade-opened/closed notifications via a Telegram bot — both empty
+    # means the feature is simply off (see app/notify/telegram.py).
+    telegram_bot_token: str = ""
+    telegram_chat_id: str = ""
+
 
 settings = Settings()
