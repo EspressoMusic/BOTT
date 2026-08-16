@@ -35,6 +35,10 @@ class ScalpingStrategy:
         slow: int = 8,
         stop_distance: float = 2.5,
         target_distance: float = 4.0,
+        stop_atr_mult: float = 2.5,
+        target_atr_mult: float = 2.5,
+        max_stop_pct: float = 0.0015,
+        max_target_pct: float = 0.0024,
         chop_lookback: int = 15,
         chop_max_crosses: int = 3,
         atr_period: int = 14,
@@ -42,8 +46,31 @@ class ScalpingStrategy:
     ):
         self.fast = fast
         self.slow = slow
+        # Floors, in the instrument's own price units — dollars for XAUUSD/BTCUSD.
+        # The actual stop/target used is whichever is bigger, this or
+        # {stop,target}_atr_mult * ATR (see evaluate()): a fixed $2.5 stop makes
+        # sense for gold (spread ~$0.20) but is invalid on a broker that quotes
+        # BTC with a ~$23 spread — MT5 rejects an order whose SL/TP ends up on
+        # the wrong side of the fill price once the spread is applied. Scaling
+        # with ATR keeps gold's already-tuned behavior (its ATR rarely exceeds
+        # these floors) while automatically widening for higher-volatility/
+        # wider-spread instruments.
         self.stop_distance = stop_distance
         self.target_distance = target_distance
+        self.stop_atr_mult = stop_atr_mult
+        self.target_atr_mult = target_atr_mult
+        # Ceilings, as a fraction of current price. ATR is recomputed from
+        # scratch over the whole candle window on every call (see evaluate());
+        # right after a strategy-engine restart, or whenever one freak candle
+        # (bad tick, brief flash move) sits in that window, the EWM needs
+        # roughly a full ATR-period's worth of new candles to "forget" it —
+        # for a 14-period ATR that's close to an hour. Until then ATR can read
+        # many times its steady-state value, and stop_atr_mult * ATR would
+        # sail past a floor that was only ever tuned for the normal case.
+        # These caps bound that failure regardless of what inflated ATR,
+        # without hardcoding per-instrument dollar values.
+        self.max_stop_pct = max_stop_pct
+        self.max_target_pct = max_target_pct
         self.chop_lookback = chop_lookback
         self.chop_max_crosses = chop_max_crosses
         self.atr_period = atr_period
@@ -80,6 +107,11 @@ class ScalpingStrategy:
         atr_prev = float(atr_series.iloc[-2])
         spiking = atr_prev > 0 and current_range > self.spike_atr_mult * atr_prev
 
+        stop_dist = max(self.stop_distance, self.stop_atr_mult * atr_prev)
+        target_dist = max(self.target_distance, self.target_atr_mult * atr_prev)
+        stop_dist = min(stop_dist, price * self.max_stop_pct)
+        target_dist = min(target_dist, price * self.max_target_pct)
+
         indicators = {
             "price": round(price, 2),
             "ema_fast": round(fast_now, 2),
@@ -97,16 +129,16 @@ class ScalpingStrategy:
             signal = Signal(
                 action="BUY",
                 reason=thought,
-                stop_loss=price - self.stop_distance,
-                take_profit=price + self.target_distance,
+                stop_loss=price - stop_dist,
+                take_profit=price + target_dist,
             )
         elif crossed_down and not choppy and not spiking:
             thought = "המחיר התחיל לרדת, נכנס למכירה מהירה."
             signal = Signal(
                 action="SELL",
                 reason=thought,
-                stop_loss=price + self.stop_distance,
-                take_profit=price - self.target_distance,
+                stop_loss=price + stop_dist,
+                take_profit=price - target_dist,
             )
         elif (crossed_up or crossed_down) and spiking:
             thought = (

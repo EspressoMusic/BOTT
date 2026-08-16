@@ -1,4 +1,5 @@
 import pandas as pd
+import pytest
 
 from app.strategies.scalping import ScalpingStrategy
 
@@ -35,8 +36,62 @@ def test_clean_trend_fires_entry_with_tight_stops():
     assert actions.count("SELL") == 0
 
     buy_result = next(r for r in results if r.signal.action == "BUY")
-    assert buy_result.signal.stop_loss == round(buy_result.indicators["price"] - strategy.stop_distance, 2)
-    assert buy_result.signal.take_profit == round(buy_result.indicators["price"] + strategy.target_distance, 2)
+    atr = buy_result.indicators["atr"]
+    expected_stop_dist = max(strategy.stop_distance, strategy.stop_atr_mult * atr)
+    expected_target_dist = max(strategy.target_distance, strategy.target_atr_mult * atr)
+    assert buy_result.signal.stop_loss == pytest.approx(buy_result.indicators["price"] - expected_stop_dist)
+    assert buy_result.signal.take_profit == pytest.approx(buy_result.indicators["price"] + expected_target_dist)
+
+
+def test_stop_and_target_widen_past_the_fixed_floor_on_a_volatile_instrument():
+    # Regression test: a fixed $2.5/$4.0 stop/target (tuned for gold, spread
+    # ~$0.20) is invalid on a broker quoting BTC with a much wider spread
+    # (~$23 seen live) — MT5 rejects the order outright. BTC-scale per-bar
+    # moves (tens of dollars) should push the ATR-scaled distance past the
+    # fixed floor automatically, without a separate instrument-specific code
+    # path.
+    strategy = ScalpingStrategy()
+    down = [63000 - i * 20 for i in range(30)]
+    up = [down[-1] + i * 30 for i in range(30)]
+    results = _run(strategy, down + up)
+
+    buy_result = next(r for r in results if r.signal.action == "BUY")
+    atr = buy_result.indicators["atr"]
+    assert atr * strategy.stop_atr_mult > strategy.stop_distance  # ATR term actually dominates here
+    # atr here is the rounded indicator value, not the exact float the strategy
+    # sized off internally — a loose tolerance absorbs that rounding.
+    stop_dist = buy_result.indicators["price"] - buy_result.signal.stop_loss
+    target_dist = buy_result.signal.take_profit - buy_result.indicators["price"]
+    assert stop_dist == pytest.approx(strategy.stop_atr_mult * atr, abs=0.05)
+    assert target_dist == pytest.approx(strategy.target_atr_mult * atr, abs=0.05)
+
+
+def test_inflated_atr_from_a_stale_spike_is_capped_as_pct_of_price():
+    # Regression test for a real live bug: right after a strategy-engine
+    # restart, one freak candle sitting in the 200-bar seed window (bad tick,
+    # brief flash move) inflates the ATR(14) EWM; because atr() is recomputed
+    # from scratch over the whole window on every call, that inflated value
+    # takes ~an ATR-period's worth of new candles (~an hour, for period=14)
+    # to decay back to normal. A real trade got a $928 stop / $904 target on
+    # BTC (atr=366.53) while the instrument's steady-state ATR was ~$7 —
+    # atr_mult * atr sailed straight past the fixed floor with nothing to
+    # stop it. The pct-of-price ceiling must hold even while ATR is this far
+    # from settled.
+    strategy = ScalpingStrategy()
+    spike = [63000.0, 63000.0, 63600.0]  # one ~$600 jump seeds a huge true range
+    calm = [63600.0 + i * 0.5 for i in range(1, 40)]  # decays slowly, still elevated
+    down = [calm[-1] - i * 1.0 for i in range(1, 10)]
+    up = [down[-1] + i * 1.5 for i in range(1, 10)]
+    results = _run(strategy, spike + calm + down + up)
+
+    entry_results = [r for r in results if r.signal.action in ("BUY", "SELL")]
+    assert entry_results, "expected at least one entry once the crossover fires"
+    for r in entry_results:
+        price = r.indicators["price"]
+        stop_dist = abs(price - r.signal.stop_loss)
+        target_dist = abs(r.signal.take_profit - price)
+        assert stop_dist <= price * strategy.max_stop_pct + 1e-6
+        assert target_dist <= price * strategy.max_target_pct + 1e-6
 
 
 def test_choppy_market_suppresses_entries():
