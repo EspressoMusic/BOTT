@@ -324,7 +324,7 @@ class OrderService:
             signal.take_profit if signal.take_profit is not None else candle.close + direction * self._default_target_distance
         )
 
-        units = float(get_setting("risk_units"))
+        units = await self._position_size(candle.close, stop_loss)
         result = await self._broker.place_order(self._instrument, signal.action, units, stop_loss, take_profit)
         if not result.success:
             logger.warning("Order placement failed: %s", result.message)
@@ -357,6 +357,32 @@ class OrderService:
         if direction_bias and signal.action == direction_bias:
             set_setting("chat_direction_bias", "")
             await self._ws.broadcast({"type": "bot_status", "payload": {"direction_bias": None}})
+
+    async def _position_size(self, price: float, stop_loss: float) -> float:
+        """Risk-based sizing: units such that a stop-out loses exactly the
+        target $ risk — (price - stop_loss) * units is the $ risk regardless
+        of contract size, since `units` here is the same notional quantity
+        the broker later divides by its own contract size (see
+        MT5Adapter._units_to_volume). Priority: a fixed `risk_dollars` amount
+        (if set) wins over `risk_pct` of the current balance, which wins over
+        the flat `risk_units` fallback — used whenever both are 0/disabled or
+        the stop distance/balance can't be read, so this never silently
+        blocks a trade.
+        """
+        stop_distance = abs(price - stop_loss)
+        if stop_distance > 0:
+            risk_dollars = float(get_setting("risk_dollars"))
+            if risk_dollars > 0:
+                return risk_dollars / stop_distance
+
+            risk_pct = float(get_setting("risk_pct"))
+            if risk_pct > 0:
+                try:
+                    account = await self._broker.get_account_state()
+                    return (account.balance * risk_pct / 100) / stop_distance
+                except Exception:
+                    logger.warning("Could not read account balance for risk-based sizing, falling back to risk_units", exc_info=True)
+        return float(get_setting("risk_units"))
 
     async def _record_close(self, broker_trade_id: str, exit_price: float, reason: str, exit_time: datetime) -> None:
         with get_session() as session:

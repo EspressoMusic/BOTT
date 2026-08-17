@@ -14,6 +14,8 @@ DEFAULTS = {
     "bot_enabled": "true",
     "active_strategy_id": "scalping",
     "risk_units": "10",
+    "risk_dollars": "0",  # fixed $ to risk per trade; 0 = disabled. Takes priority over risk_pct.
+    "risk_pct": "0",  # % of account balance to risk per trade; 0 = disabled, use risk_units instead
     "max_concurrent_positions": "1",
     "daily_profit_target_pct": "0",  # 0 = disabled
     "daily_stop_date": "",  # trading-day date (YYYY-MM-DD) the kill switch was auto-tripped on

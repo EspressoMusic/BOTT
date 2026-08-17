@@ -87,10 +87,14 @@ export function fetchSettings(): Promise<AppSettings> {
 }
 
 export function updateSettings(
-  update: Partial<Pick<AppSettings, 'risk_units' | 'max_concurrent_positions' | 'daily_profit_target_pct'>>
+  update: Partial<
+    Pick<AppSettings, 'risk_units' | 'risk_dollars' | 'risk_pct' | 'max_concurrent_positions' | 'daily_profit_target_pct'>
+  >
 ) {
   const body: Record<string, number> = {};
   if (update.risk_units !== undefined) body.risk_units = Number(update.risk_units);
+  if (update.risk_dollars !== undefined) body.risk_dollars = Number(update.risk_dollars);
+  if (update.risk_pct !== undefined) body.risk_pct = Number(update.risk_pct);
   if (update.max_concurrent_positions !== undefined) body.max_concurrent_positions = Number(update.max_concurrent_positions);
   if (update.daily_profit_target_pct !== undefined) body.daily_profit_target_pct = Number(update.daily_profit_target_pct);
   return request<AppSettings>('/api/settings', { method: 'PUT', body: JSON.stringify(body) });

@@ -9,6 +9,8 @@ import type { StrategyInfo } from '../types/market';
 
 export function SettingsPage() {
   const [riskUnits, setRiskUnits] = useState('10');
+  const [riskDollars, setRiskDollars] = useState('0');
+  const [riskPct, setRiskPct] = useState('0');
   const [maxPositions, setMaxPositions] = useState('1');
   const [dailyProfitTargetPct, setDailyProfitTargetPct] = useState('0');
   const [dailyStopDate, setDailyStopDate] = useState('');
@@ -27,6 +29,8 @@ export function SettingsPage() {
   const load = async () => {
     const [s, strats] = await Promise.all([fetchSettings(), fetchStrategies()]);
     setRiskUnits(s.risk_units);
+    setRiskDollars(s.risk_dollars);
+    setRiskPct(s.risk_pct);
     setMaxPositions(s.max_concurrent_positions);
     setDailyProfitTargetPct(s.daily_profit_target_pct);
     setDailyStopDate(s.daily_stop_date);
@@ -42,6 +46,8 @@ export function SettingsPage() {
     try {
       await updateSettings({
         risk_units: riskUnits,
+        risk_dollars: riskDollars,
+        risk_pct: riskPct,
         max_concurrent_positions: maxPositions,
         daily_profit_target_pct: dailyProfitTargetPct,
       });
@@ -80,7 +86,19 @@ export function SettingsPage() {
 
       <CollapsibleSection title="ניהול סיכון">
         <div className="settings-form-row">
-          <label>גודל עסקה (יחידות מהנכס הבסיסי — למשל אונקיות זהב או מטבעות ביטקוין)</label>
+          <label>סיכון קבוע לעסקה ($, 0 = כבוי — עדיפות ראשונה)</label>
+          <input type="number" step="1" min="0" value={riskDollars} onChange={(e) => setRiskDollars(e.target.value)} />
+        </div>
+        <p className="settings-hint">
+          כשמופעל, גודל כל עסקה מחושב אוטומטית כך שאם הסטופ-לוס ייפגע, ההפסד יהיה בדיוק הסכום הזה בדולרים — בלי קשר
+          למרחק הסטופ או ליתרה. גובר על הסיכון באחוזים למטה.
+        </p>
+        <div className="settings-form-row">
+          <label>סיכון לעסקה (% מהיתרה, 0 = כבוי — בשימוש רק כשהסיכון הקבוע בדולרים כבוי)</label>
+          <input type="number" step="0.01" min="0" value={riskPct} onChange={(e) => setRiskPct(e.target.value)} />
+        </div>
+        <div className="settings-form-row">
+          <label>גודל עסקה קבוע (יחידות מהנכס הבסיסי — בשימוש רק כששני הסיכונים למעלה כבויים)</label>
           <input type="number" step="any" min="0" value={riskUnits} onChange={(e) => setRiskUnits(e.target.value)} />
         </div>
         <div className="settings-form-row">

@@ -63,6 +63,78 @@ async def test_handle_signal_opens_a_trade():
 
 
 @pytest.mark.asyncio
+async def test_position_size_defaults_to_flat_risk_units():
+    # risk_pct defaults to "0" (disabled) — units must come straight from
+    # risk_units, unaffected by account balance or stop distance.
+    service = _service()
+    service._broker.update_price(2400.0)
+
+    await service.handle_signal(
+        Signal(action="BUY", reason="test", stop_loss=2390.0, take_profit=2420.0),
+        strategy_id="ma_crossover",
+        candle=_candle(2400.0),
+        indicators={},
+    )
+
+    with get_session() as session:
+        trade = session.exec(select(Trade)).first()
+    assert trade.units == float(get_setting("risk_units"))
+
+
+@pytest.mark.asyncio
+async def test_position_size_scales_with_risk_pct_and_stop_distance():
+    # 100k sim balance, risk_pct=0.25 -> risk $250 per trade. Stop distance
+    # here is 10 (2400 - 2390), so units must be 250 / 10 = 25 — losing
+    # exactly $250 (0.25% of balance) if the stop is hit, regardless of what
+    # risk_units is set to.
+    set_setting("risk_pct", "0.25")
+    set_setting("risk_units", "999")  # must be ignored while risk_pct is active
+    service = _service()
+    service._broker.update_price(2400.0)
+
+    await service.handle_signal(
+        Signal(action="BUY", reason="test", stop_loss=2390.0, take_profit=2420.0),
+        strategy_id="ma_crossover",
+        candle=_candle(2400.0),
+        indicators={},
+    )
+
+    with get_session() as session:
+        trade = session.exec(select(Trade)).first()
+    assert trade.units == pytest.approx(25.0)
+
+    set_setting("risk_pct", "0")
+    set_setting("risk_units", "10")
+
+
+@pytest.mark.asyncio
+async def test_position_size_uses_fixed_risk_dollars_over_pct_and_units():
+    # risk_dollars=50 must win over both risk_pct and risk_units when all
+    # three are set — stop distance is 10 (2400 - 2390), so units = 50/10 = 5,
+    # losing exactly $50 if the stop is hit regardless of account balance.
+    set_setting("risk_dollars", "50")
+    set_setting("risk_pct", "0.25")  # must be ignored while risk_dollars is active
+    set_setting("risk_units", "999")  # must be ignored while risk_dollars is active
+    service = _service()
+    service._broker.update_price(2400.0)
+
+    await service.handle_signal(
+        Signal(action="BUY", reason="test", stop_loss=2390.0, take_profit=2420.0),
+        strategy_id="ma_crossover",
+        candle=_candle(2400.0),
+        indicators={},
+    )
+
+    with get_session() as session:
+        trade = session.exec(select(Trade)).first()
+    assert trade.units == pytest.approx(5.0)
+
+    set_setting("risk_dollars", "0")
+    set_setting("risk_pct", "0")
+    set_setting("risk_units", "10")
+
+
+@pytest.mark.asyncio
 async def test_handle_signal_ignored_when_bot_disabled():
     set_setting("bot_enabled", "false")
     service = _service()

@@ -1,3 +1,4 @@
+import asyncio
 import logging
 from contextlib import asynccontextmanager
 
@@ -27,8 +28,9 @@ from app.db import get_session, init_db
 from app.instruments import find_instrument, instrument_label
 from app.market_data.service import MarketDataService
 from app.models import StrategyConfig, Trade
+from app.notify.telegram import send_telegram_message
 from app.order_service import OrderService
-from app.settings_store import get_setting, set_setting
+from app.settings_store import get_setting, is_bot_enabled, set_setting
 from app.strategies.moving_average import MovingAverageCrossoverStrategy
 from app.strategies.registry import create_builtin_strategy, create_strategy_from_config
 from app.strategy_engine import StrategyEngine
@@ -221,10 +223,34 @@ async def lifespan(app: FastAPI):
 
     app.state.switch_instrument = switch_instrument
 
+    async def heartbeat_loop() -> None:
+        """Periodic Telegram ping so a silent process death (the backend has
+        died with no crash trace more than once — see git history) shows up
+        as missing heartbeats instead of the user having to remember to check
+        the bot themselves. Sends immediately on every startup too, which
+        doubles as an "I'm back up" confirmation after any restart."""
+        interval_seconds = 60 * 60
+        while True:
+            try:
+                account = await app.state.execution_broker.get_account_state()
+                status_label = "פעיל ✅" if is_bot_enabled() else "כבוי (מתג הפעלה) ⏸️"
+                await send_telegram_message(
+                    f"💓 הבוט חי | {status_label} | נכס: {instrument_label(app.state.instrument)} | "
+                    f"יתרה: {account.balance:.2f}$ | פוזיציות פתוחות: {account.open_trade_count}"
+                )
+            except asyncio.CancelledError:
+                raise
+            except Exception:
+                logger.exception("Heartbeat failed")
+            await asyncio.sleep(interval_seconds)
+
+    heartbeat_task = asyncio.create_task(heartbeat_loop())
+
     market_data_service.start()
     try:
         yield
     finally:
+        heartbeat_task.cancel()
         await app.state.market_data_service.stop()
 
 

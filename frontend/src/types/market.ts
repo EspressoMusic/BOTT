@@ -95,6 +95,8 @@ export interface AppSettings {
   bot_enabled: 'true' | 'false';
   active_strategy_id: string;
   risk_units: string;
+  risk_dollars: string;
+  risk_pct: string;
   max_concurrent_positions: string;
   daily_profit_target_pct: string;
   daily_stop_date: string;
