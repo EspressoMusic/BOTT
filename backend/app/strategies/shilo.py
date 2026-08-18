@@ -80,8 +80,12 @@ class ShiloStrategy:
         indicators["swing_high"] = round(swing_high, 2)
         indicators["swing_low"] = round(swing_low, 2)
 
-        broke_up = price_prev <= swing_high and price > swing_high
-        broke_down = price_prev >= swing_low and price < swing_low
+        # Gate each breakout on the *current* bias too — without this, a swing
+        # level left over from a touch on the other side of the EMA (before
+        # price crossed back over it) could still fire a signal opposite to
+        # where price actually sits relative to the EMA right now.
+        broke_up = bias == "BUY" and price_prev <= swing_high and price > swing_high
+        broke_down = bias == "SELL" and price_prev >= swing_low and price < swing_low
 
         # The pullback's own extreme between the touch and the breakout —
         # the invalidation point for whichever structure just broke.
